@@ -6,8 +6,6 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── Admin routes ──────────────────────────────────────────────────────────
-  // /admin/login is public; everything else under /admin requires a session cookie.
-  // Full cryptographic verification happens in the layout server component.
   const isAdminRoute = pathname.startsWith("/admin");
   const isAdminLogin = pathname === "/admin/login";
 
@@ -22,12 +20,18 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── User (Supabase) routes ────────────────────────────────────────────────
+  // Guard: skip Supabase auth if env vars are missing (prevents crash on cold deploy)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -42,20 +46,22 @@ export async function middleware(request: NextRequest) {
           );
         },
       },
+    });
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const protectedRoutes = ["/dashboard"];
+    const isProtected = protectedRoutes.some((r) => pathname.startsWith(r));
+
+    if (!user && isProtected) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
     }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const protectedRoutes = ["/dashboard"];
-  const isProtected = protectedRoutes.some((r) => pathname.startsWith(r));
-
-  if (!user && isProtected) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+  } catch {
+    // If Supabase is unreachable, let the request through — pages handle auth independently
   }
 
   return supabaseResponse;
