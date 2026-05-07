@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE } from "@/lib/constants";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

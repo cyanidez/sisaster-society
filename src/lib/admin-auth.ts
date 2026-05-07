@@ -1,8 +1,9 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import { createAdminSupabaseClient } from "./supabase/admin-client";
+import { ADMIN_SESSION_COOKIE } from "./constants";
 
-export const ADMIN_SESSION_COOKIE = "admin_session";
+export { ADMIN_SESSION_COOKIE };
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export interface AdminUser {
