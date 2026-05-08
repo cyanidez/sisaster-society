@@ -4,20 +4,13 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin-client";
 import AddPointForm from "@/components/admin/AddPointForm";
 import {
   ArrowLeft, Star, TrendingUp, TrendingDown,
-  Clock, Heart, Gamepad2, Megaphone, Smartphone,
-  ShoppingBag, Award,
+  Clock, Award, Mail, Calendar,
 } from "lucide-react";
+import ToggleMemberButton from "@/components/admin/ToggleMemberButton";
+import AccumulationSection from "@/components/admin/AccumulationSection";
+import TransactionList from "@/components/admin/TransactionList";
 
 export const dynamic = "force-dynamic";
-
-const categoryIcons: Record<string, React.ElementType> = {
-  donation: Heart,
-  activity: Gamepad2,
-  event: Megaphone,
-  social: Smartphone,
-  purchase: ShoppingBag,
-  bonus: Star,
-};
 
 function formatDateTime(d: string) {
   return new Date(d).toLocaleDateString("th-TH", {
@@ -29,12 +22,15 @@ function formatDateTime(d: string) {
   });
 }
 
-function getLevel(pts: number) {
-  if (pts >= 10000) return { emoji: "👑", label: "Sisaster Legend", color: "text-red-400" };
-  if (pts >= 5000)  return { emoji: "⭐", label: "Sisaster Sister", color: "text-yellow-400" };
-  if (pts >= 2000)  return { emoji: "💜", label: "Sisaster Member", color: "text-purple-400" };
-  if (pts >= 500)   return { emoji: "💗", label: "Sisaster Fan",    color: "text-pink-400" };
-  return              { emoji: "🌱", label: "Oshi Beginner",         color: "text-gray-400" };
+interface Rank { id: string; name: string; emoji: string; min_points: number; color: string }
+
+function getLevel(pts: number, ranks: Rank[]) {
+  let current: Rank | null = null;
+  for (const r of ranks) {
+    if (pts >= r.min_points) current = r;
+    else break;
+  }
+  return current;
 }
 
 export default async function AdminUserDetailPage({
@@ -45,21 +41,32 @@ export default async function AdminUserDetailPage({
   const { id } = await params;
   const supabase = createAdminSupabaseClient();
 
-  const [{ data: profile }, { data: transactions }, { data: categories }] =
+  const [{ data: profile }, { data: transactions }, { data: categories }, { data: events }, { data: accumulations }, { data: ranksData }] =
     await Promise.all([
-      supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
+      supabase.from("members").select("*").eq("id", id).maybeSingle(),
       supabase
         .from("point_transactions")
         .select("*, point_categories(id, name, name_th, icon, color)")
         .eq("user_id", id)
         .order("created_at", { ascending: false }),
       supabase.from("point_categories").select("*").order("name"),
+      supabase
+        .from("events")
+        .select("id, title, icon, points, multiplier, condition_label, condition_value, condition_unit, is_accumulation")
+        .eq("is_active", true)
+        .order("title"),
+      supabase
+        .from("donation_accumulations")
+        .select("event_id, accumulated_amount, milestones_earned")
+        .eq("user_id", id),
+      supabase.from("ranks").select("*").order("min_points", { ascending: true }),
     ]);
 
   if (!profile) notFound();
 
   const txList = transactions ?? [];
-  const level = getLevel(profile.total_points ?? 0);
+  const ranks: Rank[] = ranksData ?? [];
+  const level = getLevel(profile.total_points ?? 0, ranks);
 
   // Compute running balance (newest first → calculate from oldest)
   const txWithBalance = (() => {
@@ -81,36 +88,63 @@ export default async function AdminUserDetailPage({
       {/* Back */}
       <Link
         href="/admin/users"
-        className="mb-5 inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+        className="mb-5 inline-flex items-center gap-1.5 text-xs text-gray-300 hover:text-gray-300 transition-colors"
       >
         <ArrowLeft size={13} />
         กลับรายชื่อ Users
       </Link>
 
       {/* User header */}
-      <div className="mb-6 flex flex-wrap items-start gap-4 rounded-xl border border-gray-800 bg-gray-900 p-5">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-700 to-rose-800 text-xl font-black text-white">
-          {(profile.display_name ?? profile.username).charAt(0).toUpperCase()}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold text-white">
-            {profile.display_name ?? profile.username}
-          </h1>
-          <p className="text-sm text-gray-500">@{profile.username}</p>
-          {profile.email && (
-            <p className="text-xs text-gray-600 mt-0.5">{profile.email}</p>
-          )}
-        </div>
-        <div className="text-right">
-          <div className="flex items-center gap-1.5 justify-end">
-            <Star size={16} className="text-pink-400 fill-pink-400" />
-            <span className="text-2xl font-black tabular-nums text-white">
-              {(profile.total_points ?? 0).toLocaleString()}
-            </span>
+      <div className="mb-6 rounded-xl border border-gray-800 bg-gray-900 p-5">
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-700 to-rose-800 text-xl font-black text-white">
+            {(profile.display_name ?? profile.username).charAt(0).toUpperCase()}
           </div>
-          <p className={`text-xs mt-0.5 ${level.color}`}>
-            {level.emoji} {level.label}
-          </p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg font-bold text-white">
+                {profile.display_name ?? profile.username}
+              </h1>
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                profile.is_active
+                  ? "bg-green-950/50 text-green-400"
+                  : "bg-red-950/50 text-red-400"
+              }`}>
+                {profile.is_active ? "Active" : "Inactive"}
+              </span>
+            </div>
+            <p className="text-sm text-gray-300">@{profile.username}</p>
+          </div>
+          <div className="text-right">
+            <div className="flex items-center gap-1.5 justify-end">
+              <Star size={16} className="text-pink-400 fill-pink-400" />
+              <span className="text-2xl font-black tabular-nums text-white">
+                {(profile.total_points ?? 0).toLocaleString()}
+              </span>
+            </div>
+            {level && (
+              <p className="text-xs mt-0.5 text-gray-300">
+                {level.emoji} {level.name}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Full Profile */}
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-gray-800 pt-4 text-sm">
+          <div className="flex items-center gap-2 text-gray-400">
+            <Mail size={13} className="text-gray-400 shrink-0" />
+            {profile.email ?? "—"}
+          </div>
+          <div className="flex items-center gap-2 text-gray-400">
+            <Calendar size={13} className="text-gray-400 shrink-0" />
+            สมัครเมื่อ {formatDateTime(profile.created_at)}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-4 flex items-center gap-2 border-t border-gray-800 pt-4">
+          <ToggleMemberButton userId={id} isActive={profile.is_active ?? true} />
         </div>
       </div>
 
@@ -124,10 +158,12 @@ export default async function AdminUserDetailPage({
           <div key={label} className="rounded-xl border border-gray-800 bg-gray-900 px-4 py-3">
             <Icon size={14} className={`${color} mb-1.5`} />
             <p className={`text-lg font-black tabular-nums ${color}`}>{value}</p>
-            <p className="text-xs text-gray-600">{label}</p>
+            <p className="text-xs text-gray-400">{label}</p>
           </div>
         ))}
       </div>
+
+      <AccumulationSection userId={id} events={events ?? []} accumulations={accumulations ?? []} />
 
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Add point form */}
@@ -137,7 +173,7 @@ export default async function AdminUserDetailPage({
               <Award size={15} className="text-pink-400" />
               จัดการ L-Point
             </h2>
-            <AddPointForm userId={id} categories={categories ?? []} />
+            <AddPointForm userId={id} categories={categories ?? []} events={events ?? []} accumulations={accumulations ?? []} />
           </div>
         </div>
 
@@ -150,61 +186,12 @@ export default async function AdminUserDetailPage({
                 ประวัติ L-Point ({txList.length} รายการ)
               </h2>
             </div>
-
-            {txWithBalance.length === 0 ? (
-              <div className="py-12 text-center text-gray-600">
-                <Star size={32} className="mx-auto mb-3 opacity-20" />
-                ยังไม่มีรายการ
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-800/60 max-h-[520px] overflow-y-auto">
-                {txWithBalance.map((tx) => {
-                  const cat = tx.point_categories as { name: string; name_th: string; icon: string | null } | null;
-                  const Icon = categoryIcons[cat?.name ?? ""] ?? Star;
-                  const isPositive = tx.points > 0;
-
-                  return (
-                    <div key={tx.id} className="flex items-start gap-3 px-5 py-3.5 hover:bg-gray-800/30 transition-colors">
-                      {/* Category icon */}
-                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                        isPositive ? "bg-pink-950/60" : "bg-red-950/50"
-                      }`}>
-                        <Icon size={13} className={isPositive ? "text-pink-400" : "text-red-400"} />
-                      </div>
-
-                      {/* Details */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">
-                          {tx.description_th ?? tx.description}
-                        </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {cat && (
-                            <span className="text-xs text-gray-600">
-                              {cat.icon} {cat.name_th}
-                            </span>
-                          )}
-                          <span className="text-xs text-gray-600">
-                            {formatDateTime(tx.created_at)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Points + running balance */}
-                      <div className="text-right shrink-0">
-                        <p className={`text-sm font-bold tabular-nums ${
-                          isPositive ? "text-green-400" : "text-red-400"
-                        }`}>
-                          {isPositive ? "+" : ""}{tx.points.toLocaleString()}
-                        </p>
-                        <p className="text-xs text-gray-600 tabular-nums">
-                          = {(tx as typeof tx & { balance: number }).balance.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <TransactionList
+              transactions={txWithBalance.map((tx) => ({
+                ...tx,
+                point_categories: tx.point_categories as { name: string; name_th: string; icon: string | null } | null,
+              }))}
+            />
           </div>
         </div>
       </div>

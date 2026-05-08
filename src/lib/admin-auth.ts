@@ -6,12 +6,18 @@ import { ADMIN_SESSION_COOKIE } from "./constants";
 export { ADMIN_SESSION_COOKIE };
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+export type { AdminPermission } from "./admin-permissions";
+export { ALL_PERMISSIONS } from "./admin-permissions";
+import type { AdminPermission } from "./admin-permissions";
+
 export interface AdminUser {
   id: string;
   username: string;
   email: string;
   display_name: string | null;
   is_active: boolean;
+  role: "admin" | "super_admin";
+  permissions: AdminPermission[];
   last_login_at: string | null;
 }
 

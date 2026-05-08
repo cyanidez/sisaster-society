@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin-client";
 
 export const dynamic = "force-dynamic";
 import { Badge } from "@/components/ui/badge";
@@ -22,16 +23,25 @@ const categoryIcons: Record<string, React.ElementType> = {
   bonus: Star,
 };
 
-const LEVEL_THRESHOLDS = [
-  { name: "Oshi Beginner", min: 0,    max: 499,   color: "#94a3b8", emoji: "🌱" },
-  { name: "Sisaster Fan", min: 500,   max: 1999,  color: "#ec4899", emoji: "💗" },
-  { name: "Sisaster Member", min: 2000, max: 4999, color: "#8b5cf6", emoji: "💜" },
-  { name: "Sisaster Sister", min: 5000, max: 9999, color: "#f59e0b", emoji: "⭐" },
-  { name: "Sisaster Legend", min: 10000, max: Infinity, color: "#ef4444", emoji: "👑" },
-];
+interface Rank {
+  id: string;
+  name: string;
+  emoji: string;
+  min_points: number;
+  color: string;
+}
 
-function getLevel(points: number) {
-  return LEVEL_THRESHOLDS.find((l) => points >= l.min && points <= l.max) ?? LEVEL_THRESHOLDS[0];
+function getCurrentRank(points: number, ranks: Rank[]): Rank | null {
+  let current: Rank | null = null;
+  for (const rank of ranks) {
+    if (points >= rank.min_points) current = rank;
+    else break;
+  }
+  return current;
+}
+
+function getNextRank(points: number, ranks: Rank[]): Rank | null {
+  return ranks.find((r) => r.min_points > points) ?? null;
 }
 
 function formatDate(dateStr: string) {
@@ -41,37 +51,46 @@ function formatDate(dateStr: string) {
 }
 
 function groupByCategory(transactions: PointTransaction[]) {
-  const map: Record<string, number> = {};
+  const map: Record<string, { pts: number; nameTh: string; iconKey: string }> = {};
   for (const tx of transactions) {
-    const cat = tx.point_categories?.name ?? "unknown";
-    map[cat] = (map[cat] ?? 0) + tx.points;
+    if (tx.points <= 0) continue;
+    const cat = tx.point_categories;
+    const key = cat?.name ?? "other";
+    if (!map[key]) {
+      map[key] = { pts: 0, nameTh: cat?.name_th ?? "กิจกรรมอื่นๆ", iconKey: key };
+    }
+    map[key].pts += tx.points;
   }
   return map;
 }
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
+  const userClient = await createClient();
+  const { data: { user } } = await userClient.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: transactions }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).single(),
+  const supabase = createAdminSupabaseClient();
+
+  const [{ data: profile }, { data: transactions }, { data: ranksData }] = await Promise.all([
+    supabase.from("members").select("*").eq("id", user.id).single(),
     supabase
       .from("point_transactions")
       .select("*, point_categories(*)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50),
+    supabase.from("ranks").select("*").order("min_points", { ascending: true }),
   ]);
 
   const totalPoints: number = profile?.total_points ?? 0;
   const txList: PointTransaction[] = transactions ?? [];
-  const level = getLevel(totalPoints);
-  const nextLevel = LEVEL_THRESHOLDS.find((l) => l.min > totalPoints);
-  const progressPct = nextLevel
-    ? Math.min(100, ((totalPoints - level.min) / (nextLevel.min - level.min)) * 100)
-    : 100;
+  const ranks: Rank[] = ranksData ?? [];
+  const level = getCurrentRank(totalPoints, ranks);
+  const nextLevel = getNextRank(totalPoints, ranks);
+  const progressPct =
+    level && nextLevel
+      ? Math.min(100, ((totalPoints - level.min_points) / (nextLevel.min_points - level.min_points)) * 100)
+      : level ? 100 : 0;
 
   const byCategory = groupByCategory(txList);
   const thisMonthPoints = txList
@@ -94,9 +113,11 @@ export default async function DashboardPage() {
             <div>
               <p className="text-purple-200 text-sm">ยินดีต้อนรับกลับมา</p>
               <h1 className="text-2xl font-black">{profile?.display_name ?? profile?.username}</h1>
-              <span className="inline-flex items-center gap-1 text-sm text-purple-200">
-                {level.emoji} {level.name}
-              </span>
+              {level && (
+                <span className="inline-flex items-center gap-1 text-sm text-purple-200">
+                  {level.emoji} {level.name}
+                </span>
+              )}
             </div>
           </div>
 
@@ -108,11 +129,11 @@ export default async function DashboardPage() {
               <span className="text-purple-200 mb-1">L-Point</span>
             </div>
 
-            {nextLevel ? (
+            {level && nextLevel ? (
               <>
                 <div className="flex justify-between text-xs text-purple-200 mb-1.5">
                   <span>{level.emoji} {level.name}</span>
-                  <span>อีก {(nextLevel.min - totalPoints).toLocaleString()} point → {nextLevel.emoji} {nextLevel.name}</span>
+                  <span>อีก {(nextLevel.min_points - totalPoints).toLocaleString()} pt → {nextLevel.emoji} {nextLevel.name}</span>
                 </div>
                 <div className="h-2 rounded-full bg-white/20 overflow-hidden">
                   <div
@@ -121,8 +142,10 @@ export default async function DashboardPage() {
                   />
                 </div>
               </>
+            ) : level ? (
+              <p className="text-yellow-300 text-sm font-semibold">{level.emoji} คุณถึง Rank สูงสุดแล้ว!</p>
             ) : (
-              <p className="text-yellow-300 text-sm font-semibold">👑 คุณถึง Level สูงสุดแล้ว!</p>
+              <p className="text-purple-200 text-sm">ยังไม่มีการตั้งค่า Rank</p>
             )}
           </div>
         </div>
@@ -134,7 +157,7 @@ export default async function DashboardPage() {
           {[
             { label: "Point เดือนนี้", value: thisMonthPoints.toLocaleString(), icon: TrendingUp, color: "text-pink-500", bg: "bg-pink-50" },
             { label: "รายการทั้งหมด", value: txList.length.toString(), icon: Clock, color: "text-purple-500", bg: "bg-purple-50" },
-            { label: "Level ปัจจุบัน", value: level.emoji + " " + level.name.split(" ")[1], icon: Zap, color: "text-orange-500", bg: "bg-orange-50" },
+            { label: "Rank ปัจจุบัน", value: level ? `${level.emoji} ${level.name}` : "—", icon: Zap, color: "text-orange-500", bg: "bg-orange-50" },
             { label: "Point รวม", value: totalPoints.toLocaleString(), icon: Star, color: "text-yellow-600", bg: "bg-yellow-50" },
           ].map(({ label, value, icon: Icon, color, bg }) => (
             <Card key={label}>
@@ -162,22 +185,24 @@ export default async function DashboardPage() {
               {Object.keys(byCategory).length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-4">ยังไม่มี Point</p>
               ) : (
-                Object.entries(byCategory).map(([cat, pts]) => {
-                  const Icon = categoryIcons[cat] ?? Star;
-                  const maxPts = Math.max(...Object.values(byCategory));
-                  return (
-                    <div key={cat}>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="flex items-center gap-1.5 text-gray-700">
-                          <Icon size={13} className="text-pink-400" />
-                          {cat}
-                        </span>
-                        <span className="font-bold text-gray-900">{pts.toLocaleString()}</span>
+                (() => {
+                  const maxPts = Math.max(...Object.values(byCategory).map((v) => v.pts));
+                  return Object.entries(byCategory).map(([key, { pts, nameTh, iconKey }]) => {
+                    const Icon = categoryIcons[iconKey] ?? Star;
+                    return (
+                      <div key={key}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="flex items-center gap-1.5 text-gray-700">
+                            <Icon size={13} className="text-pink-400" />
+                            {nameTh}
+                          </span>
+                          <span className="font-bold text-gray-900">{pts.toLocaleString()}</span>
+                        </div>
+                        <Progress value={(pts / maxPts) * 100} className="h-1.5" />
                       </div>
-                      <Progress value={(pts / maxPts) * 100} className="h-1.5" />
-                    </div>
-                  );
-                })
+                    );
+                  });
+                })()
               )}
             </CardContent>
           </Card>
@@ -232,40 +257,46 @@ export default async function DashboardPage() {
           </Card>
         </div>
 
-        {/* Level Guide */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">ระดับ L-Point</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              {LEVEL_THRESHOLDS.map((l) => {
-                const isCurrentLevel = totalPoints >= l.min && totalPoints <= l.max;
-                return (
-                  <div
-                    key={l.name}
-                    className={`rounded-xl p-3 text-center border-2 transition-all ${
-                      isCurrentLevel
-                        ? "border-pink-400 bg-pink-50 shadow-md"
-                        : totalPoints > l.max
-                        ? "border-gray-100 bg-gray-50 opacity-50"
-                        : "border-gray-100 bg-white"
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{l.emoji}</div>
-                    <div className="text-xs font-bold text-gray-900">{l.name}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      {l.max === Infinity ? `${l.min.toLocaleString()}+` : `${l.min.toLocaleString()}–${l.max.toLocaleString()}`}
+        {/* Rank Guide */}
+        {ranks.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">ระดับ Rank</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {ranks.map((r, i) => {
+                  const nextMin = ranks[i + 1]?.min_points;
+                  const isCurrent = level?.id === r.id;
+                  const isPassed = level ? r.min_points < level.min_points : false;
+                  return (
+                    <div
+                      key={r.id}
+                      className={`rounded-xl p-3 text-center border-2 transition-all ${
+                        isCurrent
+                          ? "border-pink-400 bg-pink-50 shadow-md"
+                          : isPassed
+                          ? "border-gray-100 bg-gray-50 opacity-50"
+                          : "border-gray-100 bg-white"
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">{r.emoji}</div>
+                      <div className="text-xs font-bold text-gray-900">{r.name}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {nextMin != null
+                          ? `${r.min_points.toLocaleString()}–${(nextMin - 1).toLocaleString()}`
+                          : `${r.min_points.toLocaleString()}+`}
+                      </div>
+                      {isCurrent && (
+                        <Badge className="mt-1.5 text-xs bg-pink-500 text-white">Rank ปัจจุบัน</Badge>
+                      )}
                     </div>
-                    {isCurrentLevel && (
-                      <Badge className="mt-1.5 text-xs bg-pink-500 text-white">ระดับปัจจุบัน</Badge>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

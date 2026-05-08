@@ -14,16 +14,10 @@ const stats = [
 
 const highlights = [
   {
-    title: "Sisaster Team",
-    desc: "ทีมแรกของ LBNK48 ประกอบด้วยสมาชิก 8 คนที่ผ่านการออดิชั่นรุ่นที่ 1",
+    title: "โปรไฟล์แอล",
+    desc: "ข้อมูลและประวัติของ สิริกร นิลกษาปน์ (แอล) สมาชิก LBNK48 Team NV",
     icon: "💝",
-    href: "/members",
-  },
-  {
-    title: "ประวัติและ Timeline",
-    desc: "ติดตามเส้นทางของ LBNK48 ตั้งแต่วันก่อตั้งจนถึงปัจจุบัน",
-    icon: "📖",
-    href: "/history",
+    href: "/profile",
   },
   {
     title: "L-Point System",
@@ -62,13 +56,13 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/members" className={cn(buttonVariants({ size: "lg" }), "bg-white text-pink-600 hover:bg-pink-50 font-bold shadow-lg")}>
+            <Link href="/profile" className={cn(buttonVariants({ size: "lg" }), "bg-white text-pink-600 hover:bg-pink-50 font-bold shadow-lg")}>
               <Users size={16} className="mr-2" />
-              ดูสมาชิก
+              โปรไฟล์แอล
             </Link>
-            <Link href="/history" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "border-white/50 text-white hover:bg-white/10 backdrop-blur-sm")}>
-              <Clock size={16} className="mr-2" />
-              ประวัติ LBNK48
+            <Link href="/dashboard" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "border-white/50 text-white hover:bg-white/10 backdrop-blur-sm")}>
+              <Star size={16} className="mr-2" />
+              L-Point
             </Link>
           </div>
         </div>
@@ -131,11 +125,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 text-center py-8 text-sm">
-        <p className="font-bold text-white mb-1">LBNK48 Sisaster Sites</p>
-        <p>© 2024 Sisaster Team Fan Site · ไม่ใช่เว็บไซต์ทางการ</p>
-      </footer>
     </div>
   );
 }

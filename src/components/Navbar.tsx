@@ -16,13 +16,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import type { Profile } from "@/lib/types";
-import { Home, Users, Clock, Star, Menu, X, LogOut, User, Briefcase, ChevronDown } from "lucide-react";
+import { Home, Users, Star, Menu, X, LogOut, User, Briefcase, ChevronDown, Gift } from "lucide-react";
 import { SUPPORTED_YEARS } from "@/data/works";
 
 const navLinks = [
   { href: "/", label: "หน้าแรก", icon: Home },
-  { href: "/history", label: "ประวัติ", icon: Clock },
-  { href: "/members", label: "สมาชิก", icon: Users },
+  { href: "/profile", label: "โปรไฟล์", icon: Users },
+  { href: "/redeem", label: "Redeem", icon: Gift },
 ];
 
 export default function Navbar() {
@@ -40,7 +40,7 @@ export default function Navbar() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await supabase
-          .from("profiles")
+          .from("members")
           .select("*")
           .eq("id", user.id)
           .single();
@@ -169,6 +169,11 @@ export default function Navbar() {
                         <User size={14} className="mr-2" /> แดชบอร์ด
                       </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Link href="/redeem" className="flex items-center w-full cursor-pointer">
+                        <Gift size={14} className="mr-2" /> Redeem
+                      </Link>
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleSignOut} className="text-red-600 cursor-pointer">
                       <LogOut size={14} className="mr-2" /> ออกจากระบบ
@@ -239,6 +244,10 @@ export default function Navbar() {
                 <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700">
                   <Star size={16} className="text-pink-500" />
                   {profile.total_points.toLocaleString()} L-Point
+                </Link>
+                <Link href="/redeem" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700">
+                  <Gift size={16} className="text-pink-500" />
+                  Redeem ของรางวัล
                 </Link>
                 <button onClick={handleSignOut} className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-red-600">
                   <LogOut size={16} /> ออกจากระบบ

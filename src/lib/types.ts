@@ -5,6 +5,7 @@ export interface Profile {
   avatar_url: string | null;
   email: string | null;
   total_points: number;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -27,27 +28,6 @@ export interface PointTransaction {
   reference_id: string | null;
   created_at: string;
   point_categories?: PointCategory;
-}
-
-export interface Member {
-  id: string;
-  name: string;
-  nickname: string;
-  nickname_th: string | null;
-  generation: number;
-  team: string | null;
-  birthday: string | null;
-  birthplace: string | null;
-  height_cm: number | null;
-  bio: string | null;
-  bio_th: string | null;
-  image_url: string | null;
-  color: string | null;
-  is_active: boolean;
-  join_date: string | null;
-  graduate_date: string | null;
-  instagram: string | null;
-  twitter: string | null;
 }
 
 export interface TimelineEvent {

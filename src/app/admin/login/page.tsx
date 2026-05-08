@@ -18,7 +18,7 @@ export default function AdminLoginPage() {
             <Shield size={26} className="text-white" />
           </div>
           <h1 className="text-xl font-bold text-white">Admin Panel</h1>
-          <p className="text-sm text-gray-500 mt-1">LBNK48 Sisaster Sites</p>
+          <p className="text-sm text-gray-300 mt-1">LBNK48 Sisaster Sites</p>
         </div>
 
         <form action={action} className="space-y-4">
@@ -62,7 +62,7 @@ export default function AdminLoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPass((p) => !p)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-300 transition-colors"
               >
                 {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
@@ -85,7 +85,7 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        <p className="mt-8 text-center text-xs text-gray-700">
+        <p className="mt-8 text-center text-xs text-gray-300">
           ระบบนี้สำหรับผู้ดูแลระบบเท่านั้น
         </p>
       </div>
