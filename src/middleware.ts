@@ -48,18 +48,8 @@ export async function middleware(request: NextRequest) {
       },
     });
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const protectedRoutes = ["/dashboard"];
-    const isProtected = protectedRoutes.some((r) => pathname.startsWith(r));
-
-    if (!user && isProtected) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
-    }
+    // Refresh session only — route protection is handled by each Server Component
+    await supabase.auth.getUser();
   } catch {
     // If Supabase is unreachable, let the request through — pages handle auth independently
   }
