@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminCategoriesPage() {
   const admin = await verifyAdminSession();
-  if (!admin || (admin.role !== "super_admin" && !admin.permissions.includes("event_management"))) notFound();
+  if (!admin || (admin.role !== "super_admin" && !admin.permissions.includes("category_management"))) notFound();
 
   const supabase = createAdminSupabaseClient();
   const { data: categories } = await supabase

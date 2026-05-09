@@ -22,11 +22,13 @@ export async function adminSignIn(
 
   const supabase = createAdminSupabaseClient();
 
-  const { data: admin } = await supabase
+  const { data: admin, error: dbError } = await supabase
     .from("admin_users")
     .select("*")
     .eq("username", username)
     .maybeSingle();
+
+  console.error("[adminSignIn] username:", username, "found:", !!admin, "dbError:", dbError?.message ?? null);
 
   // Return generic error to avoid username enumeration
   if (!admin || !admin.is_active) {
@@ -42,6 +44,7 @@ export async function adminSignIn(
 
   // Constant-time password comparison via bcrypt
   const isValid = await bcrypt.compare(password, admin.password_hash);
+  console.error("[adminSignIn] bcrypt isValid:", isValid, "hash prefix:", admin.password_hash?.slice(0, 7));
 
   if (!isValid) {
     const newAttempts = (admin.failed_login_attempts ?? 0) + 1;

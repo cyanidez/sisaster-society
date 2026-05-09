@@ -197,11 +197,11 @@ function ACLPanel({ user, onClose }: { user: AdminUserRow; onClose: () => void }
         Super Admin มีสิทธิ์ทุกหน้าอยู่แล้ว · ตั้งค่านี้มีผลเฉพาะ Admin role
       </p>
       <div className="space-y-2">
-        {ALL_PERMISSIONS.map(({ key, label, href }) => (
+        {ALL_PERMISSIONS.map(({ key, label, description }) => (
           <label key={key} className="flex items-center justify-between rounded-lg border border-gray-700 px-4 py-3 cursor-pointer hover:bg-gray-800 transition-colors">
             <div>
               <p className="text-sm font-medium text-white">{label}</p>
-              <p className="text-xs text-gray-400">{href}</p>
+              <p className="text-xs text-gray-400">{description}</p>
             </div>
             <input
               type="checkbox"

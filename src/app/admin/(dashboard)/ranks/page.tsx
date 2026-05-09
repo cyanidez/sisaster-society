@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RanksPage() {
   const admin = await verifyAdminSession();
-  if (!admin) notFound();
+  if (!admin || (admin.role !== "super_admin" && !admin.permissions.includes("rank_management"))) notFound();
 
   const supabase = createAdminSupabaseClient();
 

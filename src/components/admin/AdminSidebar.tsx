@@ -10,8 +10,8 @@ import { Users, LogOut, Shield, ChevronRight, Star, Crown, Tag, Gift, Trophy } f
 const navItems: { href: string; label: string; icon: React.ElementType; permission?: AdminPermission; superAdminOnly?: boolean }[] = [
   { href: "/admin/users",       label: "Member Management", icon: Users,   permission: "member_management" },
   { href: "/admin/events",      label: "Event Management",  icon: Star,    permission: "event_management" },
-  { href: "/admin/categories",  label: "Categories",        icon: Tag,     permission: "event_management" },
-  { href: "/admin/ranks",       label: "Rank System",       icon: Trophy,  permission: "member_management" },
+  { href: "/admin/categories",  label: "Categories",        icon: Tag,     permission: "category_management" },
+  { href: "/admin/ranks",       label: "Rank System",       icon: Trophy,  permission: "rank_management" },
   { href: "/admin/rewards",     label: "Redeem",            icon: Gift,    permission: "redeem_management" },
   { href: "/admin/admin-users", label: "Admin Users",       icon: Crown,   superAdminOnly: true },
 ];
